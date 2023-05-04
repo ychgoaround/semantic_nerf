@@ -1,7 +1,7 @@
 
 experiment:
   scene_file: "/CT/datasetNeRF/work/semantic_nerf/replica/semantic_info/room_0" # room_0,room_01, etc.
-  save_dir: "/CT/datasetNeRF/work/semantic_nerf/logs/denoising_50"  # where to store ckpts and rendering
+  save_dir: "/CT/datasetNeRF/work/semantic_nerf/logs/debug/denoising_50"  # where to store ckpts and rendering
   dataset_dir: "/CT/datasetNeRF/work/semantic_nerf/replica/room_0/Sequence_1"
   convention: "opencv"
   width: 320

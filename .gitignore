@@ -30,3 +30,5 @@ SSR/results/
 *.json
 
 SSR/configs/SSR_room0_config_test.yaml
+replica
+denoising_90.sh
