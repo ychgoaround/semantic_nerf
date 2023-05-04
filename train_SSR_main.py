@@ -11,7 +11,7 @@ from SSR.training import trainer
 
 from tqdm import  trange
 import time
-
+import torch
 def train():
     parser = argparse.ArgumentParser()
     # parser.add_argument('--config_file', type=str, default="/home/shuaifeng/Documents/PhD_Research/CodeRelease/SemanticSceneRepresentations/SSR/configs/SSR_room2_config_release.yaml", 
@@ -199,25 +199,49 @@ def train():
     # Create rays in world coordinates
     ssr_trainer.init_rays()
 
-    start = 0
+    if config['train']['resume_training'] == True:
+        print("LOAD CHECKPOINT...")
+        checkpoint = torch.load(config['train']['checkpoint_path'])
+        ssr_trainer.ssr_net_coarse.load_state_dict(checkpoint['network_coarse_state_dict'])
+        ssr_trainer.ssr_net_fine.load_state_dict(checkpoint['network_fine_state_dict'])
+        ssr_trainer.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        start = checkpoint['global_step']+1
 
-    N_iters = int(float(config["train"]["N_iters"])) + 1
-    global_step = start
-    ##########################
-    print('Begin')
-    #####  Training loop  #####
-    for i in trange(start, N_iters):
+        N_iters = int(float(config["train"]["N_iters"])) + 1
+        global_step = start
+        ##########################
+        print('Begin from step', global_step)
+        #####  Training loop  #####
+        for i in trange(start, N_iters):
 
-        time0 = time.time()
-        ssr_trainer.step(global_step)
+            time0 = time.time()
+            ssr_trainer.step(global_step)
 
-        dt = time.time()-time0
-        print()
-        print("Time per step is :", dt)
-        global_step += 1
+            dt = time.time()-time0
+            print()
+            print("Time per step is :", dt)
+            global_step += 1
 
+    else:
+        print('START TRAINING FROM SCRATCH...')
+        start = 0
 
-    print('done')
+        N_iters = int(float(config["train"]["N_iters"])) + 1
+        global_step = start
+        ##########################
+        print('Begin')
+        #####  Training loop  #####
+        for i in trange(start, N_iters):
+
+            time0 = time.time()
+            ssr_trainer.step(global_step)
+
+            dt = time.time()-time0
+            print()
+            print("Time per step is :", dt)
+            global_step += 1
+
+        print('done')
 
 
 if __name__=='__main__':

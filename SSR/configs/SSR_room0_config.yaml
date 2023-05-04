@@ -40,6 +40,8 @@ train:
     lrate_decay: 250e3
     N_iters: 30000
     wgt_sem: 4e-2
+    resume_training: True
+    checkpoint_path: '/CT/datasetNeRF/work/semantic_nerf/logs/denoising_50/checkpoints/010000.ckpt'
 
 
 
