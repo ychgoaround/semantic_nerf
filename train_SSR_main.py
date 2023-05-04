@@ -37,7 +37,7 @@ def train():
                         help='Whether to work in pixel-denoising tasks.')
     parser.add_argument("--pixel_noise_ratio", type=float, default=0,
                         help='In sparse view mode, if pixel_noise_ratio > 0, the percentage of pixels to be perturbed in each sampled frame  for pixel-wise denoising task..')
-                        
+    parser.add_argument('--gaussian_noise', action='store_true')        
     # denoising---region-wsie
     parser.add_argument("--region_denoising", action='store_true',
                         help='Whether to work in region-denoising tasks by flipping class labels of chair instances in Replica Room_2')
@@ -64,7 +64,7 @@ def train():
     parser.add_argument('--visualise_save',  action='store_true', help='whether to save the noisy labels into harddrive for later usage')
     parser.add_argument('--load_saved',  action='store_true', help='use trained noisy labels for training to ensure consistency betwwen experiments')
     parser.add_argument('--gpu', type=str, default="", help='GPU IDs.')
-
+    
     args = parser.parse_args()
     # Read YAML file
     with open(args.config_file, 'r') as f:
@@ -107,12 +107,23 @@ def train():
                 replica_data_loader.sample_label_maps(sparse_ratio=args.sparse_ratio, random_sample=args.random_sample, load_saved=args.load_saved)
         elif args.pixel_denoising:
             print("Pixel-Denoising Mode! Noise Ratio is ", args.pixel_noise_ratio)
-            replica_data_loader.add_pixel_wise_noise_label(sparse_views=args.sparse_views,
-                                sparse_ratio=args.sparse_ratio, 
-                                random_sample=args.random_sample,
-                                noise_ratio=args.pixel_noise_ratio, 
-                                visualise_save=args.visualise_save, 
-                                load_saved=args.load_saved)
+            if args.gaussian_noise:
+                print("Adding gaussian noise...")
+                replica_data_loader.add_pixel_wise_noise_label_gaussian(mean = 0.0,std = 1.0,sparse_views=args.sparse_views,
+                                    sparse_ratio=args.sparse_ratio, 
+                                    random_sample=args.random_sample,
+                                    noise_ratio=args.pixel_noise_ratio, 
+                                    visualise_save=args.visualise_save, 
+                                    load_saved=args.load_saved)
+
+            else:
+                print("Label random flipping...")
+                replica_data_loader.add_pixel_wise_noise_label(sparse_views=args.sparse_views,
+                                    sparse_ratio=args.sparse_ratio, 
+                                    random_sample=args.random_sample,
+                                    noise_ratio=args.pixel_noise_ratio, 
+                                    visualise_save=args.visualise_save, 
+                                    load_saved=args.load_saved)
         elif args.region_denoising:
             print("Chair Label Flipping for Region-wise Denoising, Flip ratio is {}, Uniform Sampling is {}".format( args.region_noise_ratio, args.uniform_flip))
             replica_data_loader.add_instance_wise_noise_label(sparse_views=args.sparse_views, sparse_ratio=args.sparse_ratio, random_sample=args.random_sample,
@@ -180,12 +191,23 @@ def train():
 
         elif  args.pixel_denoising:
             print("Pixel-Denoising Mode! Noise Ratio is ", args.pixel_noise_ratio)
-            scannet_data_loader.add_pixel_wise_noise_label(sparse_views=args.sparse_views,
-                                sparse_ratio=args.sparse_ratio, 
-                                random_sample=args.random_sample,
-                                noise_ratio=args.pixel_noise_ratio, 
-                                visualise_save=args.visualise_save, 
-                                load_saved=args.load_saved)
+            if args.gaussian_noise:
+                print("Adding gaussian noise...")
+                scannet_data_loader.add_pixel_wise_noise_label_gaussian(sparse_views=args.sparse_views,
+                                    sparse_ratio=args.sparse_ratio, 
+                                    random_sample=args.random_sample,
+                                    noise_ratio=args.pixel_noise_ratio, 
+                                    visualise_save=args.visualise_save, 
+                                    load_saved=args.load_saved)
+
+            else:
+                print("Label random flipping...")
+                scannet_data_loader.add_pixel_wise_noise_label(sparse_views=args.sparse_views,
+                                    sparse_ratio=args.sparse_ratio, 
+                                    random_sample=args.random_sample,
+                                    noise_ratio=args.pixel_noise_ratio, 
+                                    visualise_save=args.visualise_save, 
+                                    load_saved=args.load_saved)
         elif args.sparse_views:
                 print("Sparse Viewing Labels Mode! Sparse Ratio is ", args.sparse_ratio)
                 scannet_data_loader.sample_label_maps(sparse_ratio=args.sparse_ratio, random_sample=args.random_sample, load_saved=args.load_saved)
@@ -205,7 +227,7 @@ def train():
         ssr_trainer.ssr_net_coarse.load_state_dict(checkpoint['network_coarse_state_dict'])
         ssr_trainer.ssr_net_fine.load_state_dict(checkpoint['network_fine_state_dict'])
         ssr_trainer.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        start = checkpoint['global_step']+1
+        start = checkpoint['global_step']
 
         N_iters = int(float(config["train"]["N_iters"])) + 1
         global_step = start
@@ -219,7 +241,7 @@ def train():
 
             dt = time.time()-time0
             print()
-            print("Time per step is :", dt)
+            #print("Time per step is :", dt)
             global_step += 1
 
     else:
@@ -238,7 +260,7 @@ def train():
 
             dt = time.time()-time0
             print()
-            print("Time per step is :", dt)
+            #print("Time per step is :", dt)
             global_step += 1
 
         print('done')
