@@ -197,7 +197,7 @@ class ReplicaDatasetCache(Dataset):
 
     def add_pixel_wise_noise_label(self, 
         sparse_views=False, sparse_ratio=0.0, random_sample=False, 
-        noise_ratio=0.0, visualise_save=False, load_saved=False):
+        noise_ratio=0.0, visualise_save=True, load_saved=True):
         """
         sparse_views: whether we sample a subset of dense semantic labels for training
         sparse_ratio: the ratio of frames to be removed/skipped if sampling a subset of labels
@@ -285,7 +285,7 @@ class ReplicaDatasetCache(Dataset):
 
     def add_pixel_wise_noise_label_gaussian(self, mean = 0, std = 0.1,
         sparse_views=False, sparse_ratio=0.0, random_sample=False, 
-        noise_ratio=0.0, visualise_save=False, load_saved=False):
+        noise_ratio=0.0, visualise_save=True, load_saved=True):
         """
         sparse_views: whether we sample a subset of dense semantic labels for training
         sparse_ratio: the ratio of frames to be removed/skipped if sampling a subset of labels
@@ -317,7 +317,7 @@ class ReplicaDatasetCache(Dataset):
             print("{} of {} semantic labels are added noise {} percent area ratio.".format(sum(self.mask_ids), len(self.mask_ids), noise_ratio))
 
             if visualise_save:
-                noisy_sem_dir = os.path.join(self.semantic_class_dir, "noisy_pixel_sems_sr{}_nr{}".format(sparse_ratio, noise_ratio))
+                noisy_sem_dir = os.path.join(self.semantic_class_dir, "gaussian_noisy_pixel_sems_sr{}_nr{}".format(sparse_ratio, noise_ratio))
                 if not os.path.exists(noisy_sem_dir):
                     os.makedirs(noisy_sem_dir)
                 with open(os.path.join(noisy_sem_dir, "mask_ids.npy"), 'wb') as f:
@@ -362,7 +362,7 @@ class ReplicaDatasetCache(Dataset):
                         np.stack(vis_semantic_clean_list, 0), fps=30, quality=8)
         else:
             print("Load saved noisy labels.")
-            noisy_sem_dir = os.path.join(self.semantic_class_dir, "noisy_pixel_sems_sr{}_nr{}".format(sparse_ratio, noise_ratio))
+            noisy_sem_dir = os.path.join(self.semantic_class_dir, "gaussian_noisy_pixel_sems_sr{}_nr{}".format(sparse_ratio, noise_ratio))
             assert os.path.exists(noisy_sem_dir)
             self.mask_ids = np.load(os.path.join(noisy_sem_dir, "mask_ids.npy"))
             semantic_img_list = []

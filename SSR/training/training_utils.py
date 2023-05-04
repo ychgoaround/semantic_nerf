@@ -67,7 +67,7 @@ def calculate_segmentation_metrics(true_labels, predicted_labels, number_classes
     
     conf_mat = confusion_matrix(true_labels, predicted_labels, labels=list(range(number_classes)))
     norm_conf_mat = np.transpose(
-        np.transpose(conf_mat) / conf_mat.astype(np.float).sum(axis=1))
+        np.transpose(conf_mat) / conf_mat.astype(np.float64).sum(axis=1))
 
     missing_class_mask = np.isnan(norm_conf_mat.sum(1)) # missing class will have NaN at corresponding class
     exsiting_class_mask = ~ missing_class_mask
