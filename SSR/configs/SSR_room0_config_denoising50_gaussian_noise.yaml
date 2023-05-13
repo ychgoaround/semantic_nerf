@@ -1,7 +1,6 @@
-
 experiment:
   scene_file: "/CT/datasetNeRF/work/semantic_nerf/replica/semantic_info/room_0" # room_0,room_01, etc.
-  save_dir: "/CT/datasetNeRF/work/semantic_nerf/logs/denoising_50_mean0_std1.0"  # where to store ckpts and rendering
+  save_dir: "/CT/datasetNeRF/work/semantic_nerf/logs/denoising_50_mean0.0_std5.0"  # where to store ckpts and rendering
   dataset_dir: "/CT/datasetNeRF/work/semantic_nerf/replica/room_0/Sequence_1"
   convention: "opencv"
   width: 320
@@ -35,10 +34,14 @@ render:
     depth_range: [0.1, 10.0]
     white_bkgd: false  # set to render synthetic data on a white bkgd (always use for dvoxels)
 
+noise:
+    gaussian_mean: 0.0
+    gaussian_var: 5.0
+
 train:
     lrate: 5e-4
     lrate_decay: 250e3
-    N_iters: 30000
+    N_iters: 10000
     wgt_sem: 4e-2
     resume_training: False
     checkpoint_path: None
@@ -48,7 +51,7 @@ train:
 logging: # logging/saving options
     step_log_print: 10  # 'frequency of console print'
     step_log_tfb: 100
-    step_save_ckpt: 2500
-    step_val: 10000 # frequency of rendering on unseen data
-    step_vis_train: 10000
+    step_save_ckpt: 1000
+    step_val: 1000 # frequency of rendering on unseen data
+    step_vis_train: 1000
 

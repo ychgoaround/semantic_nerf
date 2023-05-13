@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -t 08:00:00
+#SBATCH -t 24:00:00
 #SBATCH -o /scratch/inf0/user/yuchi/slurm-%j.out
  
 # call your program here

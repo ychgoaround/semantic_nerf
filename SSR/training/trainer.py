@@ -910,7 +910,22 @@ class SSRTrainer(object):
         img_loss_coarse = img2mse(rgb_coarse, sampled_gt_rgb)
 
         if self.enable_semantic and sematic_available:
-            semantic_loss_coarse = crossentropy_loss(sem_logits_coarse, sampled_gt_semantic)
+            if not self.config['experiment']["one_hot_gaussian_noise"]:
+                semantic_loss_coarse = crossentropy_loss(sem_logits_coarse, sampled_gt_semantic)
+            else:
+                print("ADDING NOISE to one-hot vector")
+                mean = torch.unsqueeze(sampled_gt_semantic, 1)
+                score = torch.zeros_like(sem_logits_coarse)
+                for i in range(sem_logits_coarse.size()[1]):
+                    score[:,i] = i +1
+                print("mean", mean)
+                print('score -  mean',score - mean)
+                print("sem_logits_coarse", sem_logits_coarse)
+                prob = torch.exp((-0.5)*((score - mean)/self.config['noise']['gaussian_var'])**2)
+                prob = prob / torch.unsqueeze(torch.sum(prob, axis =1), 1)
+                semantic_loss_coarse = crossentropy_loss(sem_logits_coarse, prob)
+                
+            
         else:
             semantic_loss_coarse = torch.tensor(0)
 
@@ -921,7 +936,20 @@ class SSRTrainer(object):
         if self.N_importance > 0:
             img_loss_fine = img2mse(rgb_fine, sampled_gt_rgb)
             if self.enable_semantic and sematic_available:
-                semantic_loss_fine = crossentropy_loss(sem_logits_fine, sampled_gt_semantic)
+                if not self.config['experiment']["one_hot_gaussian_noise"]:
+                    semantic_loss_fine = crossentropy_loss(sem_logits_fine, sampled_gt_semantic)
+                else:
+                    print("ADDING NOISE to one-hot vector")
+                    mean = torch.unsqueeze(sampled_gt_semantic, 1)
+                    score = torch.zeros_like(sem_logits_fine)
+                    for i in range(sem_logits_fine.size()[1]):
+                        score[:,i] = i +1
+            
+                    prob = torch.exp((-0.5)*((score - mean)/self.config['noise']['gaussian_var'])**2)
+                    prob = prob / torch.unsqueeze(torch.sum(prob, axis =1), 1)
+                    print("prob", prob)
+                    semantic_loss_fine = crossentropy_loss(sem_logits_fine, prob)
+                    
             else:
                 semantic_loss_fine = torch.tensor(0)
             with torch.no_grad():
@@ -961,6 +989,8 @@ class SSRTrainer(object):
 
             # add raw transparancy value into tfb histogram
             trans_coarse = output_dict["raw_coarse"][..., 3]   
+            print('global step', global_step)
+            print('trans_coarse', trans_coarse)
             self.tfb_viz.vis_histogram(global_step, trans_coarse, 'trans_coarse')     
             if self.N_importance>0:
                 trans_fine = output_dict['raw_fine'][..., 3]   
@@ -1241,12 +1271,24 @@ class SSRTrainer(object):
                 dep_mm = (deps[-1]*1000).astype(np.uint16)
                 vis_dep = vis_deps[-1]
 
+                if not os.path.exists(os.path.join(save_dir,'rgb')):
+                    os.makedirs(os.path.join(save_dir, 'rgb'))
+                    
+                if not os.path.exists(os.path.join(save_dir,'disp')):
+                    os.makedirs(os.path.join(save_dir, 'disp'))
+                    
+                if not os.path.exists(os.path.join(save_dir,'depth')):
+                    os.makedirs(os.path.join(save_dir, 'depth'))
+                    
+                if not os.path.exists(os.path.join(save_dir,'vis_depth')):
+                    os.makedirs(os.path.join(save_dir, 'vis_depth'))
+                
+                    
+                rgb_filename = os.path.join(save_dir,'rgb', 'rgb_{:03d}.png'.format(i))
+                disp_filename = os.path.join(save_dir, 'disp','disp_{:03d}.png'.format(i))
 
-                rgb_filename = os.path.join(save_dir, 'rgb_{:03d}.png'.format(i))
-                disp_filename = os.path.join(save_dir, 'disp_{:03d}.png'.format(i))
-
-                depth_filename = os.path.join(save_dir, 'depth_{:03d}.png'.format(i))
-                vis_depth_filename = os.path.join(save_dir, 'vis_depth_{:03d}.png'.format(i))
+                depth_filename = os.path.join(save_dir, 'depth','depth_{:03d}.png'.format(i))
+                vis_depth_filename = os.path.join(save_dir, 'vis_depth','vis_depth_{:03d}.png'.format(i))
 
                 imageio.imwrite(rgb_filename, rgb8)
                 imageio.imwrite(disp_filename, disp, format="png", prefer_uint8=False)
@@ -1256,11 +1298,23 @@ class SSRTrainer(object):
                 
                 if self.enable_semantic:
 
-                    label_filename = os.path.join(save_dir, 'label_{:03d}.png'.format(i))
-                    vis_label_filename = os.path.join(save_dir, 'vis_label_{:03d}.png'.format(i))
+                    if not os.path.exists(os.path.join(save_dir,'label')):
+                        os.makedirs(os.path.join(save_dir, 'label'))
+                        
+                    if not os.path.exists(os.path.join(save_dir,'vis_label')):
+                        os.makedirs(os.path.join(save_dir, 'vis_label'))
+                        
+                    if not os.path.exists(os.path.join(save_dir,'entropy')):
+                        os.makedirs(os.path.join(save_dir, 'entropy'))
+                        
+                    if not os.path.exists(os.path.join(save_dir,'vis_entropy')):
+                        os.makedirs(os.path.join(save_dir, 'vis_entropy'))
+                    
+                    label_filename = os.path.join(save_dir,'label', 'label_{:03d}.png'.format(i))
+                    vis_label_filename = os.path.join(save_dir, 'vis_label','vis_label_{:03d}.png'.format(i))
 
-                    entropy_filename = os.path.join(save_dir, 'entropy_{:03d}.png'.format(i))
-                    vis_entropy_filename = os.path.join(save_dir, 'vis_entropy_{:03d}.png'.format(i))
+                    entropy_filename = os.path.join(save_dir,'entropy' ,'entropy_{:03d}.png'.format(i))
+                    vis_entropy_filename = os.path.join(save_dir,'vis_entropy', 'vis_entropy_{:03d}.png'.format(i))
                     sem = sems[-1]
                     vis_sem = vis_sems[-1]
 

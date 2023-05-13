@@ -37,7 +37,11 @@ def train():
                         help='Whether to work in pixel-denoising tasks.')
     parser.add_argument("--pixel_noise_ratio", type=float, default=0,
                         help='In sparse view mode, if pixel_noise_ratio > 0, the percentage of pixels to be perturbed in each sampled frame  for pixel-wise denoising task..')
-    parser.add_argument('--gaussian_noise', action='store_true')        
+    parser.add_argument('--gaussian_noise', action='store_true')   
+    parser.add_argument('--one_hot_gaussian_noise', action = 'store_true')
+    parser.add_argument('--mix_partial_and_full_random_flipping', action = 'store_true')
+    parser.add_argument('--add_random_noise_by_position', action = 'store_true')
+    
     # denoising---region-wsie
     parser.add_argument("--region_denoising", action='store_true',
                         help='Whether to work in region-denoising tasks by flipping class labels of chair instances in Replica Room_2')
@@ -109,13 +113,31 @@ def train():
             print("Pixel-Denoising Mode! Noise Ratio is ", args.pixel_noise_ratio)
             if args.gaussian_noise:
                 print("Adding gaussian noise...")
-                replica_data_loader.add_pixel_wise_noise_label_gaussian(mean = 0.0,std = 1.0,sparse_views=args.sparse_views,
+                replica_data_loader.add_pixel_wise_noise_label_gaussian(mean = config['noise']['gaussian_mean'],std = config['noise']['gaussian_var'],sparse_views=args.sparse_views,
                                     sparse_ratio=args.sparse_ratio, 
                                     random_sample=args.random_sample,
                                     noise_ratio=args.pixel_noise_ratio, 
                                     visualise_save=args.visualise_save, 
                                     load_saved=args.load_saved)
 
+            elif args.mix_partial_and_full_random_flipping:
+                print("Add mixture of partial and full random flipping noise with sparse ratio {} and noise ratio {}", args.sparse_ratio, args.pixel_noise_ratio )
+                replica_data_loader.add_pixel_wise_noise_label_mixture(sparse_views=True,
+                                    sparse_ratio=args.sparse_ratio, 
+                                    random_sample=args.random_sample,
+                                    noise_ratio=args.pixel_noise_ratio, 
+                                    visualise_save=args.visualise_save, 
+                                    load_saved=args.load_saved)
+                
+            elif args.add_random_noise_by_position:
+                print("Add random label flipping by position...")
+                replica_data_loader.add_pixel_wise_noise_label_by_position(sparse_views=args.sparse_views,
+                                    sparse_ratio=args.sparse_ratio, 
+                                    random_sample=args.random_sample,
+                                    noise_ratio=args.pixel_noise_ratio, 
+                                    visualise_save=args.visualise_save, 
+                                    load_saved=args.load_saved)
+                
             else:
                 print("Label random flipping...")
                 replica_data_loader.add_pixel_wise_noise_label(sparse_views=args.sparse_views,
@@ -191,15 +213,25 @@ def train():
 
         elif  args.pixel_denoising:
             print("Pixel-Denoising Mode! Noise Ratio is ", args.pixel_noise_ratio)
+            print('test', args.add_random_noise_by_position)
             if args.gaussian_noise:
                 print("Adding gaussian noise...")
-                scannet_data_loader.add_pixel_wise_noise_label_gaussian(sparse_views=args.sparse_views,
+                scannet_data_loader.add_pixel_wise_noise_label_gaussian(mean = config['noise']['gaussian_mean'],std = config['noise']['gaussian_var'], sparse_views=args.sparse_views,
                                     sparse_ratio=args.sparse_ratio, 
                                     random_sample=args.random_sample,
                                     noise_ratio=args.pixel_noise_ratio, 
                                     visualise_save=args.visualise_save, 
                                     load_saved=args.load_saved)
 
+            elif args.add_random_noise_by_position:
+                print("Add random noise by position...")
+                scannet_data_loader.add_pixel_wise_noise_label_by_position(sparse_views=args.sparse_views,
+                                    sparse_ratio=args.sparse_ratio, 
+                                    random_sample=args.random_sample,
+                                    noise_ratio=args.pixel_noise_ratio, 
+                                    visualise_save=args.visualise_save, 
+                                    load_saved=args.load_saved)
+                
             else:
                 print("Label random flipping...")
                 scannet_data_loader.add_pixel_wise_noise_label(sparse_views=args.sparse_views,
@@ -230,7 +262,7 @@ def train():
         start = checkpoint['global_step']
 
         N_iters = int(float(config["train"]["N_iters"])) + 1
-        global_step = start
+        global_step = start + 1
         ##########################
         print('Begin from step', global_step)
         #####  Training loop  #####

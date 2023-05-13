@@ -282,8 +282,7 @@ class ReplicaDatasetCache(Dataset):
                 semantic_img_list.append(semantic)
             self.train_samples["semantic_remap"]  = np.asarray(semantic_img_list)
 
-
-    def add_pixel_wise_noise_label_gaussian(self, mean = 0, std = 0.1,
+    def add_pixel_wise_noise_label_by_position(self, 
         sparse_views=False, sparse_ratio=0.0, random_sample=False, 
         noise_ratio=0.0, visualise_save=True, load_saved=True):
         """
@@ -304,20 +303,17 @@ class ReplicaDatasetCache(Dataset):
 
             for i in range(len(self.mask_ids)):
                 if self.mask_ids[i] == 1:  # add label noise to unmasked/available labels
-                    noisy_index_1d = np.random.permutation(num_pixel)[:num_pixel_noisy]
+                    noisy_index_1d = np.arange(num_pixel)[:num_pixel_noisy]
                     faltten_sem = train_sem[i].flatten()
-                    print('previously,', faltten_sem[noisy_index_1d])
-                    faltten_sem[noisy_index_1d] =  faltten_sem[noisy_index_1d] + np.random.normal(mean, std, num_pixel_noisy)
-                    faltten_sem[faltten_sem<0] = 0
-                    faltten_sem[faltten_sem>=self.num_semantic_class] = self.num_semantic_class -1
-                    print('after adding noise,', faltten_sem[noisy_index_1d])
+
+                    faltten_sem[noisy_index_1d] = np.random.choice(self.num_semantic_class, num_pixel_noisy)
                     # we replace the label of randomly selected num_pixel_noisy pixels to random labels from [1, self.num_semantic_class], 0 class is the none class
                     train_sem[i] = faltten_sem.reshape(self.img_h, self.img_w)
 
             print("{} of {} semantic labels are added noise {} percent area ratio.".format(sum(self.mask_ids), len(self.mask_ids), noise_ratio))
 
             if visualise_save:
-                noisy_sem_dir = os.path.join(self.semantic_class_dir, "gaussian_noisy_pixel_sems_sr{}_nr{}".format(sparse_ratio, noise_ratio))
+                noisy_sem_dir = os.path.join(self.semantic_class_dir, "noisy_pixel_sems_sr{}_nr{}_pos".format(sparse_ratio, noise_ratio))
                 if not os.path.exists(noisy_sem_dir):
                     os.makedirs(noisy_sem_dir)
                 with open(os.path.join(noisy_sem_dir, "mask_ids.npy"), 'wb') as f:
@@ -362,7 +358,7 @@ class ReplicaDatasetCache(Dataset):
                         np.stack(vis_semantic_clean_list, 0), fps=30, quality=8)
         else:
             print("Load saved noisy labels.")
-            noisy_sem_dir = os.path.join(self.semantic_class_dir, "gaussian_noisy_pixel_sems_sr{}_nr{}".format(sparse_ratio, noise_ratio))
+            noisy_sem_dir = os.path.join(self.semantic_class_dir, "noisy_pixel_sems_sr{}_nr{}_pos".format(sparse_ratio, noise_ratio))
             assert os.path.exists(noisy_sem_dir)
             self.mask_ids = np.load(os.path.join(noisy_sem_dir, "mask_ids.npy"))
             semantic_img_list = []
@@ -374,6 +370,201 @@ class ReplicaDatasetCache(Dataset):
             self.train_samples["semantic_remap"]  = np.asarray(semantic_img_list)
 
 
+    def add_pixel_wise_noise_label_gaussian(self, mean = 0, std = 0.1,
+        sparse_views=False, sparse_ratio=0.0, random_sample=False, 
+        noise_ratio=0.0, visualise_save=True, load_saved=True):
+        """
+        sparse_views: whether we sample a subset of dense semantic labels for training
+        sparse_ratio: the ratio of frames to be removed/skipped if sampling a subset of labels
+        random_sample: whether to random sample frames or interleavely/evenly sample, True--random sample; False--interleavely sample
+        noise_ratio: the ratio of num pixels per-frame to be randomly perturbed
+        visualise_save: whether to save the noisy labels into harddrive for later usage
+        load_saved: use trained noisy labels for training to ensure consistency betwwen experiments
+        """
+        
+        print("GAUSSIAN NOISE MEAN", mean)
+        print("GAUSSIAN NOISE VAR", std)
+
+        if not load_saved:
+            if sparse_views:
+                self.sample_label_maps(sparse_ratio=sparse_ratio, random_sample=random_sample)
+            num_pixel = self.img_h * self.img_w
+            num_pixel_noisy = int(num_pixel*noise_ratio)
+            train_sem = self.train_samples["semantic_remap"]
+
+            for i in range(len(self.mask_ids)):
+                if self.mask_ids[i] == 1:  # add label noise to unmasked/available labels
+                    noisy_index_1d = np.random.permutation(num_pixel)[:num_pixel_noisy]
+                    faltten_sem = train_sem[i].flatten()
+                    print('previously,', faltten_sem[noisy_index_1d])
+                    faltten_sem[noisy_index_1d] =  faltten_sem[noisy_index_1d] + np.random.normal(mean, std, num_pixel_noisy).astype('int')
+                    faltten_sem[faltten_sem<0] = 0
+                    faltten_sem[faltten_sem>=self.num_semantic_class] = self.num_semantic_class -1
+                    print('after adding noise,', faltten_sem[noisy_index_1d])
+                    # we replace the label of randomly selected num_pixel_noisy pixels to random labels from [1, self.num_semantic_class], 0 class is the none class
+                    train_sem[i] = faltten_sem.reshape(self.img_h, self.img_w)
+
+            print("{} of {} semantic labels are added noise {} percent area ratio.".format(sum(self.mask_ids), len(self.mask_ids), noise_ratio))
+
+            if visualise_save:
+                noisy_sem_dir = os.path.join(self.semantic_class_dir, "gaussian_noisy_pixel_sems_sr{}_nr{}_mean_{}_var_{}".format(sparse_ratio, noise_ratio, mean,std))
+                if not os.path.exists(noisy_sem_dir):
+                    os.makedirs(noisy_sem_dir)
+                with open(os.path.join(noisy_sem_dir, "mask_ids.npy"), 'wb') as f:
+                    np.save(f, self.mask_ids)
+
+                vis_noisy_semantic_list = []
+                vis_semantic_clean_list = []
+
+                colour_map_np = self.colour_map_np
+                # 101 classes in total from Replica, select the existing class from total colour map
+
+                semantic_remap = self.train_samples["semantic_remap"] # [H, W, 3]
+                semantic_remap_clean = self.train_samples["semantic_remap_clean"] # [H, W, 3]
+
+                # save semantic labels
+                for i in range(len(self.mask_ids)):
+                    if self.mask_ids[i] == 1: 
+                        vis_noisy_semantic = colour_map_np[semantic_remap[i]] # [H, W, 3]
+                        vis_semantic_clean = colour_map_np[semantic_remap_clean[i]] # [H, W, 3]
+
+                        imageio.imwrite(os.path.join(noisy_sem_dir, "semantic_class_{}.png".format(i)), semantic_remap[i])
+                        imageio.imwrite(os.path.join(noisy_sem_dir, "vis_sem_class_{}.png".format(i)), vis_noisy_semantic)
+
+                        vis_noisy_semantic_list.append(vis_noisy_semantic)
+                        vis_semantic_clean_list.append(vis_semantic_clean)
+                    else:
+                        # for mask_ids of 0, we skip these frames during training and do not add noise
+                        vis_noisy_semantic = colour_map_np[semantic_remap[i]] # [H, W, 3]
+                        vis_semantic_clean = colour_map_np[semantic_remap_clean[i]] # [H, W, 3]
+                        assert np.all(vis_noisy_semantic==vis_semantic_clean) # apply this check to skipped frames
+
+                        imageio.imwrite(os.path.join(noisy_sem_dir, "semantic_class_{}.png".format(i)), semantic_remap[i])
+                        imageio.imwrite(os.path.join(noisy_sem_dir, "vis_sem_class_{}.png".format(i)), vis_noisy_semantic)
+
+                        vis_noisy_semantic_list.append(vis_noisy_semantic)
+                        vis_semantic_clean_list.append(vis_semantic_clean)
+
+                imageio.mimwrite(os.path.join(noisy_sem_dir, 'noisy_sem_ratio_{}.mp4'.format(noise_ratio)), 
+                        np.stack(vis_noisy_semantic_list, 0), fps=30, quality=8)
+                
+                imageio.mimwrite(os.path.join(noisy_sem_dir, 'clean_sem.mp4'), 
+                        np.stack(vis_semantic_clean_list, 0), fps=30, quality=8)
+        else:
+            print("Load saved noisy labels.")
+            noisy_sem_dir = os.path.join(self.semantic_class_dir, "gaussian_noisy_pixel_sems_sr{}_nr{}_mean_{}_var_{}".format(sparse_ratio, noise_ratio, mean, std))
+            assert os.path.exists(noisy_sem_dir)
+            self.mask_ids = np.load(os.path.join(noisy_sem_dir, "mask_ids.npy"))
+            semantic_img_list = []
+            semantic_path_list = sorted(glob.glob(noisy_sem_dir + '/semantic_class_*.png'), key=lambda file_name: int(file_name.split("_")[-1][:-4]))
+            assert len(semantic_path_list)>0
+            for idx in range(len(self.mask_ids)):
+                semantic = imread(semantic_path_list[idx])
+                semantic_img_list.append(semantic)
+            self.train_samples["semantic_remap"]  = np.asarray(semantic_img_list)
+
+
+    def add_pixel_wise_noise_label_mixture(self, 
+        sparse_views=False, sparse_ratio=0.0, random_sample=False, 
+        noise_ratio=0.0, visualise_save=True, load_saved=True):
+        """
+        sparse_views: whether we sample a subset of dense semantic labels for training
+        sparse_ratio: the ratio of frames to be removed/skipped if sampling a subset of labels
+        random_sample: whether to random sample frames or interleavely/evenly sample, True--random sample; False--interleavely sample
+        noise_ratio: the ratio of num pixels per-frame to be randomly perturbed
+        visualise_save: whether to save the noisy labels into harddrive for later usage
+        load_saved: use trained noisy labels for training to ensure consistency betwwen experiments
+        """
+
+        if not load_saved:
+            if sparse_views:
+                self.sample_label_maps(sparse_ratio=sparse_ratio, random_sample=random_sample)
+            num_pixel = self.img_h * self.img_w
+            num_pixel_noisy = int(num_pixel*noise_ratio)
+            train_sem = self.train_samples["semantic_remap"]
+
+            for i in range(len(self.mask_ids)):
+                if self.mask_ids[i] == 1:  # add label noise to unmasked/available labels
+                    print("add partial random flipping noise")
+                    noisy_index_1d = np.random.permutation(num_pixel)[:num_pixel_noisy]
+                    faltten_sem = train_sem[i].flatten()
+
+                    faltten_sem[noisy_index_1d] = np.random.choice(self.num_semantic_class, num_pixel_noisy)
+                    # we replace the label of randomly selected num_pixel_noisy pixels to random labels from [1, self.num_semantic_class], 0 class is the none class
+                    train_sem[i] = faltten_sem.reshape(self.img_h, self.img_w)
+                    
+                else:
+                    print("add full random flipping noise")
+                    noisy_index_1d = np.random.permutation(num_pixel)
+                    faltten_sem = train_sem[i].flatten()
+
+                    faltten_sem[noisy_index_1d] = np.random.choice(self.num_semantic_class, num_pixel)
+                    # we replace the label of randomly selected num_pixel_noisy pixels to random labels from [1, self.num_semantic_class], 0 class is the none class
+                    train_sem[i] = faltten_sem.reshape(self.img_h, self.img_w)
+                    
+                    
+
+            print("{} of {} semantic labels are added noise {} percent area ratio.".format(sum(self.mask_ids), len(self.mask_ids), noise_ratio))
+
+            if visualise_save:
+                noisy_sem_dir = os.path.join(self.semantic_class_dir, "noisy_pixel_sems_sr{}_nr{}".format(sparse_ratio, noise_ratio))
+                if not os.path.exists(noisy_sem_dir):
+                    os.makedirs(noisy_sem_dir)
+                with open(os.path.join(noisy_sem_dir, "mask_ids.npy"), 'wb') as f:
+                    np.save(f, self.mask_ids)
+
+                vis_noisy_semantic_list = []
+                vis_semantic_clean_list = []
+
+                colour_map_np = self.colour_map_np
+                # 101 classes in total from Replica, select the existing class from total colour map
+
+                semantic_remap = self.train_samples["semantic_remap"] # [H, W, 3]
+                semantic_remap_clean = self.train_samples["semantic_remap_clean"] # [H, W, 3]
+
+                # save semantic labels
+                for i in range(len(self.mask_ids)):
+                    if self.mask_ids[i] == 1: 
+                        vis_noisy_semantic = colour_map_np[semantic_remap[i]] # [H, W, 3]
+                        vis_semantic_clean = colour_map_np[semantic_remap_clean[i]] # [H, W, 3]
+
+                        imageio.imwrite(os.path.join(noisy_sem_dir, "semantic_class_{}.png".format(i)), semantic_remap[i])
+                        imageio.imwrite(os.path.join(noisy_sem_dir, "vis_sem_class_{}.png".format(i)), vis_noisy_semantic)
+
+                        vis_noisy_semantic_list.append(vis_noisy_semantic)
+                        vis_semantic_clean_list.append(vis_semantic_clean)
+                    else:
+                        # for mask_ids of 0, we skip these frames during training and do not add noise
+                        vis_noisy_semantic = colour_map_np[semantic_remap[i]] # [H, W, 3]
+                        vis_semantic_clean = colour_map_np[semantic_remap_clean[i]] # [H, W, 3]
+                        #assert np.all(vis_noisy_semantic==vis_semantic_clean) # apply this check to skipped frames
+
+                        imageio.imwrite(os.path.join(noisy_sem_dir, "semantic_class_{}.png".format(i)), semantic_remap[i])
+                        imageio.imwrite(os.path.join(noisy_sem_dir, "vis_sem_class_{}.png".format(i)), vis_noisy_semantic)
+
+                        vis_noisy_semantic_list.append(vis_noisy_semantic)
+                        vis_semantic_clean_list.append(vis_semantic_clean)
+
+                imageio.mimwrite(os.path.join(noisy_sem_dir, 'noisy_sem_ratio_{}.mp4'.format(noise_ratio)), 
+                        np.stack(vis_noisy_semantic_list, 0), fps=30, quality=8)
+                
+                imageio.mimwrite(os.path.join(noisy_sem_dir, 'clean_sem.mp4'), 
+                        np.stack(vis_semantic_clean_list, 0), fps=30, quality=8)
+        else:
+            print("Load saved noisy labels.")
+            noisy_sem_dir = os.path.join(self.semantic_class_dir, "noisy_pixel_sems_sr{}_nr{}".format(sparse_ratio, noise_ratio))
+            assert os.path.exists(noisy_sem_dir)
+            self.mask_ids = np.load(os.path.join(noisy_sem_dir, "mask_ids.npy"))
+            semantic_img_list = []
+            semantic_path_list = sorted(glob.glob(noisy_sem_dir + '/semantic_class_*.png'), key=lambda file_name: int(file_name.split("_")[-1][:-4]))
+            assert len(semantic_path_list)>0
+            for idx in range(len(self.mask_ids)):
+                semantic = imread(semantic_path_list[idx])
+                semantic_img_list.append(semantic)
+            self.train_samples["semantic_remap"]  = np.asarray(semantic_img_list)
+
+    
+    
     def add_instance_wise_noise_label(self, sparse_views=False, sparse_ratio=0.0, random_sample=False,
             flip_ratio=0.0, uniform_flip=False, 
             instance_id=[3, 6, 7, 9, 11, 12, 13, 48],  
@@ -480,6 +671,8 @@ class ReplicaDatasetCache(Dataset):
                 semantic = imread(semantic_path_list[idx])
                 semantic_img_list.append(semantic)
             self.train_samples["semantic_remap"]  = np.asarray(semantic_img_list)
+
+
 
     def super_resolve_label(self, down_scale_factor=8, dense_supervision=True):
         """ In super-resolution mode, to create training supervisions, we downscale the ground truth label by certain scaling factor to 
