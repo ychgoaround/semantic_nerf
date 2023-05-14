@@ -35,3 +35,4 @@ denoising_90.sh
 
 job_scripts/*
 SSR/configs
+replica_dataset

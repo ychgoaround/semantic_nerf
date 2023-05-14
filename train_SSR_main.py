@@ -41,7 +41,7 @@ def train():
     parser.add_argument('--one_hot_gaussian_noise', action = 'store_true')
     parser.add_argument('--mix_partial_and_full_random_flipping', action = 'store_true')
     parser.add_argument('--add_random_noise_by_position', action = 'store_true')
-    
+    parser.add_argument('--add_gaussian_noise_to_training_images', action = 'store_true')
     # denoising---region-wsie
     parser.add_argument("--region_denoising", action='store_true',
                         help='Whether to work in region-denoising tasks by flipping class labels of chair instances in Replica Room_2')
@@ -114,6 +114,15 @@ def train():
             if args.gaussian_noise:
                 print("Adding gaussian noise...")
                 replica_data_loader.add_pixel_wise_noise_label_gaussian(mean = config['noise']['gaussian_mean'],std = config['noise']['gaussian_var'],sparse_views=args.sparse_views,
+                                    sparse_ratio=args.sparse_ratio, 
+                                    random_sample=args.random_sample,
+                                    noise_ratio=args.pixel_noise_ratio, 
+                                    visualise_save=args.visualise_save, 
+                                    load_saved=args.load_saved)
+                
+            elif args.add_gaussian_noise_to_training_images:
+                print("Adding RGB GAUSSIAN NOISE...")
+                replica_data_loader.add_pixel_wise_noise_rgb_gaussian(mean = config['noise']['gaussian_mean'],std = config['noise']['gaussian_var'],sparse_views=args.sparse_views,
                                     sparse_ratio=args.sparse_ratio, 
                                     random_sample=args.random_sample,
                                     noise_ratio=args.pixel_noise_ratio, 
